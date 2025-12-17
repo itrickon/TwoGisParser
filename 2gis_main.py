@@ -48,7 +48,7 @@ class TwoGisMapParse:
                     break
                 firm_data = await self.__get_firm_data(url=href)  # Ищем все данные фирмы
 
-                if self.true_phone != "---":
+                if self.true_phone != "---" or (self.true_phone == "---" and self.true_site != "Нет ссылки на сайт"):
                     self.list_of_companies.append(firm_data)  # Добавляем в список, который потом пойдет в xlsx
 
     async def __get_firm_data(self, url: str):
@@ -57,10 +57,12 @@ class TwoGisMapParse:
         await self.page2.goto(url=url)  # Переходим на неё
 
         self.true_phone = "Телефон не найден"  # Если будет не найдено
-        true_site = "Нет ссылки на сайт"
+        self.true_site = "Нет ссылки на сайт"
 
         # Название фирмы
         firm_title = (await self.page2.title()).split(",")[0]  # Отделяем: (Назв.фирмы, ул. ...)
+        # Категория
+        firm_category = (await self.page2.title()).split(",")[1]  # Отделяем: (Назв.фирмы, ул. ...)
 
         # Номер телефона
         try:
@@ -83,11 +85,11 @@ class TwoGisMapParse:
                 a = list(filter(lambda i: (i if (".ru" in i or ".com" in i or 
                                                  ".рф" in i or ".net" in i
                                                  ) and "@" not in i else ""),site_texts,))  # Фильтруем, чтоб выводилось нужное
-                true_site = f"{a[0]}"
+                self.true_site = f"{a[0]}"
             except:
-                true_site = "Нет ссылки на сайт"
+                self.true_site = "Нет ссылки на сайт"
         await self.page2.close()
-        return [firm_title, self.true_phone, true_site, "-"]
+        return ['', firm_title, firm_category, self.true_phone, self.true_site, "-"]
 
     async def check_xlsx(self):
         """Функция для создания заготовки под xlsx файл"""
@@ -99,7 +101,7 @@ class TwoGisMapParse:
         self.ws = self.wb.active
 
         # Добавляем заголовки
-        headers = ["Название", "Телефон", "Сайт", "URL"]
+        headers = ["URL", "Название", "Категория", "Телефон", "Сайт"]
         for col, header in enumerate(headers, start=1):
             self.ws.cell(row=1, column=col, value=header)
 
@@ -168,12 +170,12 @@ class TwoGisMapParse:
                 await self.page.close()
 
             print(f"Записано {self.ws.max_row - 1} организаций")
-            await self.page.close()
-            await asyncio.sleep(180)
+            await asyncio.sleep(4)
+            self.page.close()
 
 
 async def main():
-    parser = TwoGisMapParse(keyword="Мойка", sity="Челябинск", max_num_firm=50)
+    parser = TwoGisMapParse(keyword="Мойка", sity="Челябинск", max_num_firm=200)
     await parser.parse_main()
 
 
