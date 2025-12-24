@@ -234,9 +234,6 @@ class MainApplication(ttk.Frame):
         # Восстанавливаем размеры окна
         self.parent.geometry(current_geometry)
         
-        # Обновляем состояние кнопок
-        self.toggle_parser_mode()
-        
     async def translate_text(self, sity):
         """Переводим город на английский для удобства"""
         self.translator = Translator()
@@ -269,6 +266,7 @@ class MainApplication(ttk.Frame):
                               f"Хотите переключиться на парсер по URL?"):
             self.parser_mode_key.set("url")
             self.toggle_parser_mode()
+        self.status_var.set("URL сгенерирован")
             
     def run_parsing(self):
         """Запуск парсинга в зависимости от выбранного режима"""
@@ -361,7 +359,7 @@ class MainApplication(ttk.Frame):
             loop.run_until_complete(
                 parser_instance.parse_main(update_callback=self.update_gui_from_thread)
             )
-        except Exception as e:
+        except:
             self.update_gui_from_thread("Парсинг завершен")
             self.is_parsing = False
             loop.close()
@@ -396,6 +394,7 @@ class MainApplication(ttk.Frame):
         """Очистка лога"""
         self.log_text.delete(1.0, tk.END)
         self.log_message("Лог очищен")
+        self.status_var.set("Лог очищен")
         
     def log_message(self, message):
         """Добавление сообщения в лог"""

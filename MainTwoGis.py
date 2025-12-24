@@ -182,11 +182,11 @@ class TwoGisMapParse:
 
             print(f"Записано {self.ws.max_row - 1} организаций")
             await asyncio.sleep(4)
-            self.page.close()
+            browser.close()
 
 
 async def main():
-    parser = TwoGisMapParse(keyword="Авто Мойка", sity="Волгоград", max_num_firm=200)
+    parser = TwoGisMapParse(keyword="Авто Мойка", sity="Волгоград", max_num_firm=5)
     await parser.parse_main()
 
 
