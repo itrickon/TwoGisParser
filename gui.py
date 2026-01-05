@@ -167,6 +167,12 @@ class MainApplication(ttk.Frame):
         self.log_text = tk.Text(log_frame, height=20, wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True)
         
+        # Добавляем раскраску вывода текста в "Лог выполнения"
+        self.log_text.tag_config("INFO", foreground="black")
+        self.log_text.tag_config("ERROR", foreground="red")
+        self.log_text.tag_config("WARNING", foreground="orange")
+        self.log_text.tag_config("SUCCESS", foreground="green")
+        
         # Добавляем скроллбар
         scrollbar = ttk.Scrollbar(self.log_text)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
@@ -400,10 +406,30 @@ class MainApplication(ttk.Frame):
         self.status_var.set("Лог очищен")
         
     def log_message(self, message):
-        """Добавление сообщения в лог"""
+        """Добавление сообщения в лог с цветами"""
         import datetime
+        
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-        self.log_text.insert(tk.END, f"[{timestamp}] {message}\n")
+        
+        # Определяем уровень
+        msg_lower = message.lower()
+        error_words = ["ошибка", "error", "closed", "exception", "failed", "прервано"]
+        warning_words = ["предупреждение", "warning", "внимание", "остановлен"]
+        success_words = ["успешно", "success", "завершен", "готово", "успешн"]
+        
+        if any(word in msg_lower for word in error_words):
+            level = "ERROR"
+        elif any(word in msg_lower for word in warning_words):
+            level = "WARNING"
+        elif any(word in msg_lower for word in success_words):
+            level = "SUCCESS"
+        else:
+            level = "INFO"
+        
+        formatted_message = f"[{timestamp}] [{level}] {message}\n"
+        
+        # Вставляем с тегом
+        self.log_text.insert(tk.END, formatted_message, (level,))
         self.log_text.see(tk.END)
 
     def user_manual(self):
@@ -488,6 +514,8 @@ class MainApplication(ttk.Frame):
                 return
         
         if messagebox.askyesno("Выход", "Вы уверены, что хотите выйти?"):
+            if self.is_parsing:
+                self.stop_parsing()
             self.parent.quit()
 
     def create_status_bar(self):
