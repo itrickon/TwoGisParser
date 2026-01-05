@@ -40,6 +40,7 @@ class MainApplication(ttk.Frame):
         self.top_level_menu()
         self.create_parser_controls()
         self.create_status_bar()
+        self.bind_hotkeys()
         
     def top_level_menu(self):
         """Верхнее меню"""
@@ -55,6 +56,8 @@ class MainApplication(ttk.Frame):
         help_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Справка", menu=help_menu)
         help_menu.add_command(label="Руководство пользователя", command=self.user_manual)
+        help_menu.add_command(label="Горячие клавиши", command=self.hotkeys_info)
+        help_menu.add_separator()
         help_menu.add_command(label="О программе", command=self.btn_about)
 
     def create_parser_controls(self):
@@ -430,6 +433,26 @@ class MainApplication(ttk.Frame):
         """
         messagebox.showinfo("Руководство пользователя", about_text, icon="question")
 
+    def hotkeys_info(self):
+        """Обработчик кнопки 'Горячие клавиши'"""
+        hotkeys_text = """
+        Горячие клавиши приложения:
+        
+        Основные операции:
+        • Ctrl + R      - Запустить парсинг
+        • Ctrl + S      - Остановить парсинг
+        • Ctrl + L      - Очистить лог
+        • Ctrl + Q      - Выйти из приложения
+        
+        Дополнительные:
+        • Ctrl + G      - Сгенерировать URL (в режиме по ключу)
+        • F1            - Руководство пользователя
+        • Enter         - Запустить парсинг (когда курсор в поле ввода)
+        
+        Сочетания клавиш работают в любом месте приложения.
+        """
+        messagebox.showinfo("Горячие клавиши", hotkeys_text, icon="info")
+
     def btn_about(self):
         """Обработчик кнопки 'О программе'"""
         about_text = """
@@ -474,6 +497,18 @@ class MainApplication(ttk.Frame):
         self.status_bar = ttk.Label(self, textvariable=self.status_var, 
                                    relief=tk.SUNKEN, padding=(10, 5))
         self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
+    def bind_hotkeys(self):
+        """Привязка горячих клавиш к существующим функциям"""
+        self.parent.bind('<Control-r>', lambda e: self.run_parsing())
+        self.parent.bind('<Control-s>', lambda e: self.stop_parsing())
+        self.parent.bind('<Control-l>', lambda e: self.clear_log())
+        self.parent.bind('<Control-q>', lambda e: self.btn_exit())
+        self.parent.bind('<F1>', lambda e: self.user_manual())
+        self.parent.bind('<Control-g>', lambda e: self.generate_url())
+        
+        # Enter в полях ввода тоже запускает парсинг
+        self.parent.bind('<Return>', lambda e: self.run_parsing())
 
 
 def main():
