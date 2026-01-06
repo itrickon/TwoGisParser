@@ -4,6 +4,7 @@ import threading
 import asyncio
 import heavy_dicts
 import re
+import datetime
 from tkinter import ttk, messagebox
 from googletrans import Translator
 from MainTwoGis import TwoGisMapParse
@@ -407,8 +408,6 @@ class MainApplication(ttk.Frame):
         
     def log_message(self, message):
         """Добавление сообщения в лог с цветами"""
-        import datetime
-        
         timestamp = datetime.datetime.now().strftime("%H:%M:%S")
         
         # Определяем уровень

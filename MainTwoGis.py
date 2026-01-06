@@ -2,12 +2,12 @@ import random
 import os
 import openpyxl
 import asyncio
+import re
 from playwright.async_api import async_playwright
 from typing import List
 from openpyxl import Workbook
 from googletrans import Translator
-from collections import deque
-
+from heavy_dicts import city_mapping
 
 class TwoGisMapParse:
     def __init__(self, keyword: str, sity: str, max_num_firm: int):
@@ -15,7 +15,7 @@ class TwoGisMapParse:
         self.sity = sity  # Ищем в определённом городе
         self.max_num_firm = max_num_firm  # Максимальное количество фирм
         self.data_saving = "2gis_parse_results/data.xlsx"
-        self.list_of_companies = deque()  # сюда добавляем списки из __get_firm_data, чтобы потом ввести их в xlsx
+        self.list_of_companies = []  # сюда добавляем списки из __get_firm_data, чтобы потом ввести их в xlsx
         self.start_row = 2
         if os.path.exists(self.data_saving):
             os.remove(self.data_saving)
@@ -27,9 +27,12 @@ class TwoGisMapParse:
     async def translate_text(self, sity):
         """Переводим город на английский для удобства"""
         # Проверяем, является ли слово английским (только латинские буквы)
-        import re
         is_english = bool(re.match(r'^[a-zA-Z\s\-]+$', sity))
         
+        try:
+            return city_mapping[sity]
+        except:
+            pass
         if is_english:
             # Если уже английское слово, просто форматируем
             sity_clean = '-'.join(sity.split())
