@@ -11,10 +11,12 @@ from heavy_dicts import city_mapping
 import time
 
 class TwoGisMultiCityParser:
-    def __init__(self, cities: List[str], keyword: str = "Шубы", max_num_firm: int = 5):
+    def __init__(self, cities: List[str], keyword: str = "Шубы", max_num_firm: int = 5, 
+                 max_concurrent: int = 3):
         self.cities = cities  # Список городов для проверки
         self.keyword = keyword  # Ключевое слово для поиска
         self.max_num_firm = max_num_firm  # Максимальное количество фирм на город
+        self.max_concurrent = max_concurrent  # Максимальное количество одновременных обработок
         self.data_saving = "2gis_multi_city_results/data.xlsx"  # Путь к файлу результатов
         self.results = []  # Результаты проверки городов
         self.start_row = 2  # Начальная строка для записи в Excel
@@ -29,10 +31,8 @@ class TwoGisMultiCityParser:
 
     async def translate_city_name(self, city_name: str) -> str:
         """Переводим название города в формат для URL"""
-        # Проверяем, является ли слово английским (только латинские буквы)
         is_english = bool(re.match(r'^[a-zA-Z\s\-]+$', city_name))
         
-        # Сначала пробуем взять из словаря city_mapping
         try:
             if city_name in city_mapping:
                 return city_mapping[city_name]
@@ -40,11 +40,9 @@ class TwoGisMultiCityParser:
             pass
         
         if is_english:
-            # Если уже английское слово, просто форматируем
             city_clean = '-'.join(city_name.split())
             return city_clean.lower()
         else:
-            # Если русское слово - переводим через googletrans
             translator = Translator()
             a = await translator.translate(city_name, src="ru", dest="en")
             a = '-'.join(a.text.split())
@@ -52,15 +50,13 @@ class TwoGisMultiCityParser:
 
     async def check_city_in_url(self, url: str, city_code: str) -> bool:
         """Проверяем наличие city_code в URL несколькими способами"""
-        # Основная проверка - простое вхождение строки
         if city_code in url:
             return True
         
-        # Также проверяем варианты с поддоменами и другими форматами
         patterns = [
-            rf'https://2gis\.ru/{re.escape(city_code)}',  # основной формат
-            rf'https://{re.escape(city_code)}\.2gis\.ru',  # поддомен
-            rf'/{re.escape(city_code)}/',  # в пути URL
+            rf'https://2gis\.ru/{re.escape(city_code)}',
+            rf'https://{re.escape(city_code)}\.2gis\.ru',
+            rf'/{re.escape(city_code)}/',
         ]
         
         for pattern in patterns:
@@ -72,35 +68,30 @@ class TwoGisMultiCityParser:
     async def process_city(self, city: str, context) -> Optional[Dict]:
         """Обрабатываем один город"""
         try:
-            print(f"\n{'='*60}")
             print(f"Обрабатываем город: {city}")
-            print(f"{'='*60}")
             
             # Получаем city_code для города
             city_code = await self.translate_city_name(city)
-            print(f"City code для {city}: {city_code}")
             
             # Создаем новую страницу для этого города
             page = await context.new_page()
             
             # Переходим на главную страницу города в 2ГИС
             city_url = f"https://2gis.ru/{city_code}"
-            print(f"Переходим по URL: {city_url}")
             
             try:
                 # Загружаем страницу города
                 await page.goto(city_url, wait_until="domcontentloaded", timeout=30000)
-                await self.random_delay(2, 3)
+                await self.random_delay(0.5, 1)
                 
                 # Получаем текущий URL после загрузки
                 current_url = page.url
-                print(f"Текущий URL: {current_url}")
                 
                 # Проверяем, что город есть в URL
                 city_in_url = await self.check_city_in_url(current_url, city_code)
                 
                 if not city_in_url:
-                    print(f"✗ Город {city_code} не найден в URL: {current_url}")
+                    print(f"✗ Город {city} не найден в URL: {current_url}")
                     await page.close()
                     return {
                         'city_name': city,
@@ -112,12 +103,8 @@ class TwoGisMultiCityParser:
                         'error': f"Город {city_code} не найден в URL: {current_url}"
                     }
                 
-                print(f"✓ Город {city_code} найден в URL")
-                
                 # Ищем поле поиска
-                print(f"Ищем поле поиска для ключевого слова: {self.keyword}")
                 try:
-                    # Пробуем найти поле поиска разными селекторами
                     search_selectors = [
                         '[placeholder*="Поиск"]',
                         '[placeholder*="2ГИС"]',
@@ -135,34 +122,26 @@ class TwoGisMultiCityParser:
                             continue
                     
                     if search_input:
-                        # Вводим ключевое слово с задержкой
                         await search_input.type(text=self.keyword, delay=0.4)
                         await page.keyboard.press("Enter")
-                        await self.random_delay(3, 4)
+                        await self.random_delay(1, 2)
                     else:
-                        # Если не нашли поле поиска, формируем URL поиска напрямую
                         search_url = f"https://2gis.ru/{city_code}/search/{self.keyword}"
-                        print(f"Поле поиска не найдено, пробуем прямой переход: {search_url}")
                         await page.goto(search_url, wait_until="domcontentloaded")
-                        await self.random_delay(3, 4)
+                        await self.random_delay(1, 2)
                         
                 except Exception as e:
-                    print(f"Ошибка при поиске: {str(e)}")
-                    # Формируем URL поиска напрямую
                     search_url = f"https://2gis.ru/{city_code}/search/{self.keyword}"
-                    print(f"Пробуем прямой переход: {search_url}")
                     await page.goto(search_url, wait_until="domcontentloaded")
-                    await self.random_delay(3, 4)
+                    await self.random_delay(1, 2)
                 
                 # Проверяем URL после поиска
                 current_url_after_search = page.url
-                print(f"URL после поиска: {current_url_after_search}")
                 
                 # Проверяем, остался ли город в URL после поиска
                 city_still_in_url = await self.check_city_in_url(current_url_after_search, city_code)
                 
                 # Ищем карточки организаций
-                print("Ищем карточки организаций...")
                 company_cards = await page.query_selector_all('a[href*="/firm/"]')
                 
                 # Фильтруем только видимые карточки
@@ -190,9 +169,6 @@ class TwoGisMultiCityParser:
                 }
                 
                 print(f"✓ Успешно обработан город {city}")
-                print(f"  City code в URL после поиска: {city_still_in_url}")
-                print(f"  Найдено видимых карточек: {len(visible_cards)}")
-                print(f"  Найдены результаты: {results_found}")
                 
             except Exception as e:
                 print(f"✗ Ошибка при обработке города {city}: {str(e)}")
@@ -228,6 +204,38 @@ class TwoGisMultiCityParser:
                 'error': str(e)
             }
 
+    async def process_city_batch(self, cities_batch: List[str], context):
+        """Обрабатываем пакет городов параллельно"""
+        tasks = []
+        for city in cities_batch:
+            task = asyncio.create_task(self.process_city(city, context))
+            tasks.append(task)
+        
+        # Ожидаем завершения всех задач в пакете
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Обрабатываем результаты
+        processed_results = []
+        for i, result in enumerate(results):
+            city = cities_batch[i]
+            if isinstance(result, Exception):
+                print(f"✗ Исключение при обработке города {city}: {str(result)}")
+                processed_results.append({
+                    'city_name': city,
+                    'city_code': None,
+                    'initial_url': None,
+                    'final_url': None,
+                    'city_in_url': False,
+                    'results_found': False,
+                    'num_cards_found': 0,
+                    'success': False,
+                    'error': str(result)
+                })
+            else:
+                processed_results.append(result)
+        
+        return processed_results
+
     async def create_excel_template(self):
         """Создаем шаблон Excel файла"""
         os.makedirs("2gis_multi_city_results", exist_ok=True)
@@ -236,22 +244,14 @@ class TwoGisMultiCityParser:
         self.ws = self.wb.active
         self.ws.title = "Проверка городов"
         
-        # Заголовки столбцов
         headers = [
-            "Город", 
-            "City Code", 
-            "Начальный URL", 
-            "Финальный URL",
-            "Город в URL", 
-            "Найдены результаты", 
-            "Количество карточек",
-            "Успешно", 
-            "Ошибка"
+            "Город", "City Code", "Начальный URL", "Финальный URL",
+            "Город в URL", "Найдены результаты", "Количество карточек",
+            "Успешно", "Ошибка"
         ]
         
         for col, header in enumerate(headers, start=1):
             self.ws.cell(row=1, column=col, value=header)
-            # Устанавливаем ширину столбцов
             self.ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 25
 
     async def save_to_excel(self):
@@ -264,9 +264,8 @@ class TwoGisMultiCityParser:
         await self.create_excel_template()
         
         # Записываем все результаты
-        current_row = 2  # Начинаем с 2-й строки (после заголовков)
+        current_row = 2
         for result in self.results:
-            # Используем get() с значениями по умолчанию для всех ключей
             row = [
                 result.get('city_name', ''),
                 result.get('city_code', ''),
@@ -284,7 +283,6 @@ class TwoGisMultiCityParser:
             
             current_row += 1
         
-        # Сохраняем файл
         self.wb.save(self.data_saving)
         print(f"\n✓ Сохранено {len(self.results)} строк в {self.data_saving}")
 
@@ -307,6 +305,7 @@ class TwoGisMultiCityParser:
         print(f"\n{'='*60}")
         print(f"Начинаем проверку {total_cities} городов")
         print(f"Ключевое слово: {self.keyword}")
+        print(f"Одновременно обрабатывается: {self.max_concurrent} городов")
         print(f"{'='*60}")
         
         async with async_playwright() as playwright:
@@ -320,30 +319,34 @@ class TwoGisMultiCityParser:
                 timezone_id="Europe/Moscow",
             )
             
-            # Обрабатываем города по очереди
-            for i, city in enumerate(self.cities, 1):
-                print(f"\n[{i}/{total_cities}] Обработка города: {city}")
-                
-                # Обрабатываем город
-                result = await self.process_city(city, context)
-                self.results.append(result)
-                
-                if result['success']:
-                    successful += 1
-                else:
-                    failed += 1
-                
-                # Сохраняем промежуточные результаты каждые 5 городов
-                if i % 5 == 0:
-                    await self.save_to_excel()
-                    print(f"\nПромежуточное сохранение... Обработано {i}/{total_cities} городов")
-                
-                # Небольшая задержка между запросами
-                if i < total_cities:
-                    await self.random_delay(2, 4)
+            # Разбиваем города на пакеты
+            batches = [self.cities[i:i + self.max_concurrent] 
+                      for i in range(0, len(self.cities), self.max_concurrent)]
             
-            # Сохраняем финальные результаты
-            await self.save_to_excel()
+            total_batches = len(batches)
+            
+            for batch_num, city_batch in enumerate(batches, 1):
+                print(f"\nПакет {batch_num}/{total_batches}: {', '.join(city_batch)}")
+                
+                # Обрабатываем пакет городов параллельно
+                batch_results = await self.process_city_batch(city_batch, context)
+                
+                # Добавляем результаты
+                for result in batch_results:
+                    self.results.append(result)
+                    if result.get('success'):
+                        successful += 1
+                    else:
+                        failed += 1
+                
+                # Сохраняем промежуточные результаты
+                if batch_num % 2 == 0 or batch_num == total_batches:
+                    await self.save_to_excel()
+                    print(f"Промежуточное сохранение... Обработано {len(self.results)}/{total_cities} городов")
+                
+                # Небольшая задержка между пакетами
+                if batch_num < total_batches:
+                    await self.random_delay(3, 5)
             
             # Закрываем браузер
             await browser.close()
@@ -519,11 +522,12 @@ async def main():
     "Ярославль", "Ярцево", "Ясногорск", "Ясный", "Яхрома"
     ]
     
-    # Создаем парсер
+    # Создаем парсер с максимальным количеством одновременных обработок = 4
     parser = TwoGisMultiCityParser(
         cities=cities,
         keyword="Шубы",
-        max_num_firm=3
+        max_num_firm=3,
+        max_concurrent=4  # Обрабатывать по 4 города одновременно
     )
     
     # Запускаем парсинг
