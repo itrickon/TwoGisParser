@@ -189,7 +189,7 @@ class TwoGisMapParse:
 
 
 async def main():
-    parser = TwoGisMapParse(keyword="Авто Мойка", sity="Пермь", max_num_firm=5)
+    parser = TwoGisMapParse(keyword="Авто Мойка", sity="Малоярославец", max_num_firm=5)
     await parser.parse_main()
 
 

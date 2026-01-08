@@ -1,36 +1,36 @@
 import random
 import os
-import openpyxl
 import asyncio
 import re
+import json
 from playwright.async_api import async_playwright
-from typing import List, Dict, Optional
-from openpyxl import Workbook
+from typing import List
 from googletrans import Translator
 from heavy_dicts import city_mapping 
 import time
 
-class TwoGisMultiCityParser:
-    def __init__(self, cities: List[str], keyword: str = "Шубы", max_num_firm: int = 5, 
-                 max_concurrent: int = 3):
-        self.cities = cities  # Список городов для проверки
-        self.keyword = keyword  # Ключевое слово для поиска
-        self.max_num_firm = max_num_firm  # Максимальное количество фирм на город
-        self.max_concurrent = max_concurrent  # Максимальное количество одновременных обработок
-        self.data_saving = "2gis_multi_city_results/data.xlsx"  # Путь к файлу результатов
-        self.results = []  # Результаты проверки городов
-        self.start_row = 2  # Начальная строка для записи в Excel
+class TwoGisCityChecker:
+    def __init__(self, cities: List[str], keyword: str = "Шубы", max_concurrent: int = 3):
+        self.cities = cities
+        self.keyword = keyword
+        self.max_concurrent = max_concurrent
+        self.results_dir = "2gis_check_results"
+        self.failed_cities_file = f"{self.results_dir}/failed_cities.json"
+        self.successful_cities = []  # Города, которые нашлись
+        self.failed_cities = []      # Города, которые не нашлись
+        self.errors = []             # Ошибки при проверке
         
-        # Удаляем старый файл, если существует
-        if os.path.exists(self.data_saving):
-            os.remove(self.data_saving)
+        # Создаем папку для результатов
+        os.makedirs(self.results_dir, exist_ok=True)
+        
+        # Очищаем файл не найденных городов
+        if os.path.exists(self.failed_cities_file):
+            os.remove(self.failed_cities_file)
 
     async def random_delay(self, min_seconds=1, max_seconds=3):
-        """Случайная задержка между действиями"""
         await asyncio.sleep(random.uniform(min_seconds, max_seconds))
 
     async def translate_city_name(self, city_name: str) -> str:
-        """Переводим название города в формат для URL"""
         is_english = bool(re.match(r'^[a-zA-Z\s\-]+$', city_name))
         
         try:
@@ -49,7 +49,6 @@ class TwoGisMultiCityParser:
             return a.lower()
 
     async def check_city_in_url(self, url: str, city_code: str) -> bool:
-        """Проверяем наличие city_code в URL несколькими способами"""
         if city_code in url:
             return True
         
@@ -65,24 +64,26 @@ class TwoGisMultiCityParser:
         
         return False
 
-    async def process_city(self, city: str, context) -> Optional[Dict]:
-        """Обрабатываем один город"""
+    async def check_single_city(self, city: str, context) -> str:
+        """Проверяем один город. Возвращает 'found', 'not_found' или 'error'"""
+        page = None
         try:
-            print(f"Обрабатываем город: {city}")
-            
             # Получаем city_code для города
             city_code = await self.translate_city_name(city)
             
-            # Создаем новую страницу для этого города
+            # Создаем новую страницу
             page = await context.new_page()
             
-            # Переходим на главную страницу города в 2ГИС
+            # Пробуем загрузить главную страницу города
             city_url = f"https://2gis.ru/{city_code}"
-            
+            await self.random_delay(1, 2)
             try:
-                # Загружаем страницу города
-                await page.goto(city_url, wait_until="domcontentloaded", timeout=30000)
-                await self.random_delay(3, 4)
+                response = await page.goto(city_url, wait_until="domcontentloaded", timeout=15000)
+                
+                # Проверяем статус ответа
+                if response and response.status >= 400:
+                    # Страница не найдена (404) или другая ошибка
+                    return 'not_found'
                 
                 # Получаем текущий URL после загрузки
                 current_url = page.url
@@ -91,232 +92,96 @@ class TwoGisMultiCityParser:
                 city_in_url = await self.check_city_in_url(current_url, city_code)
                 
                 if not city_in_url:
-                    print(f"✗ Город {city} не найден в URL: {current_url}")
-                    await page.close()
-                    return {
-                        'city_name': city,
-                        'city_code': city_code,
-                        'initial_url': city_url,
-                        'final_url': current_url,
-                        'city_in_url': False,
-                        'success': False,
-                        'error': f"Город {city_code} не найден в URL: {current_url}"
-                    }
+                    return 'not_found'
                 
-                # Ищем поле поиска
-                try:
-                    search_selectors = [
-                        '[placeholder*="Поиск"]',
-                        '[placeholder*="2ГИС"]',
-                        'input[type="search"]',
-                        '.searchInput input'
-                    ]
-                    
-                    search_input = None
-                    for selector in search_selectors:
-                        try:
-                            search_input = await page.wait_for_selector(selector, timeout=2000)
-                            if search_input:
-                                break
-                        except:
-                            continue
-                    
-                    if search_input:
-                        await search_input.type(text=self.keyword, delay=0.4)
-                        await page.keyboard.press("Enter")
-                        await self.random_delay(1, 2)
-                    else:
-                        search_url = f"https://2gis.ru/{city_code}/search/{self.keyword}"
-                        await page.goto(search_url, wait_until="domcontentloaded")
-                        await self.random_delay(1, 2)
-                        
-                except Exception as e:
-                    search_url = f"https://2gis.ru/{city_code}/search/{self.keyword}"
-                    await page.goto(search_url, wait_until="domcontentloaded")
-                    await self.random_delay(1, 2)
-                
-                # Проверяем URL после поиска
-                current_url_after_search = page.url
-                
-                # Проверяем, остался ли город в URL после поиска
-                city_still_in_url = await self.check_city_in_url(current_url_after_search, city_code)
-                
-                # Ищем карточки организаций
-                company_cards = await page.query_selector_all('a[href*="/firm/"]')
-                
-                # Фильтруем только видимые карточки
-                visible_cards = []
-                for card in company_cards:
-                    try:
-                        if await card.is_visible():
-                            visible_cards.append(card)
-                    except:
-                        continue
-                
-                results_found = len(visible_cards) > 0
-                
-                # Формируем результат
-                result = {
-                    'city_name': city,
-                    'city_code': city_code,
-                    'initial_url': city_url,
-                    'final_url': current_url_after_search,
-                    'city_in_url': city_still_in_url,
-                    'results_found': results_found,
-                    'num_cards_found': len(visible_cards),
-                    'success': True,
-                    'error': None
-                }
-                
-                print(f"✓ Успешно обработан город {city}")
+                # Город найден
+                return 'found'
                 
             except Exception as e:
-                print(f"✗ Ошибка при обработке города {city}: {str(e)}")
-                result = {
-                    'city_name': city,
-                    'city_code': city_code,
-                    'initial_url': city_url,
-                    'final_url': page.url if 'page' in locals() else None,
-                    'city_in_url': False,
-                    'results_found': False,
-                    'num_cards_found': 0,
-                    'success': False,
-                    'error': str(e)
-                }
-            
-            # Закрываем страницу
-            if 'page' in locals():
-                await page.close()
-                
-            return result
+                # Ошибка при загрузке страницы
+                if "Timeout" in str(e) or "net::ERR" in str(e):
+                    return 'not_found'
+                return 'error'
             
         except Exception as e:
-            print(f"✗ Критическая ошибка при обработке города {city}: {str(e)}")
-            return {
-                'city_name': city,
-                'city_code': None,
-                'initial_url': None,
-                'final_url': None,
-                'city_in_url': False,
-                'results_found': False,
-                'num_cards_found': 0,
-                'success': False,
-                'error': str(e)
-            }
+            return 'error'
+        
+        finally:
+            # Закрываем страницу
+            if page and not page.is_closed():
+                await page.close()
 
-    async def process_city_batch(self, cities_batch: List[str], context):
-        """Обрабатываем пакет городов параллельно"""
+    async def check_city_batch(self, cities_batch: List[str], context):
+        """Проверяем пакет городов параллельно"""
         tasks = []
         for city in cities_batch:
-            task = asyncio.create_task(self.process_city(city, context))
-            tasks.append(task)
+            task = asyncio.create_task(self.check_single_city(city, context))
+            tasks.append((city, task))
         
-        # Ожидаем завершения всех задач в пакете
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Обрабатываем результаты
-        processed_results = []
-        for i, result in enumerate(results):
-            city = cities_batch[i]
-            if isinstance(result, Exception):
-                print(f"✗ Исключение при обработке города {city}: {str(result)}")
-                processed_results.append({
-                    'city_name': city,
-                    'city_code': None,
-                    'initial_url': None,
-                    'final_url': None,
-                    'city_in_url': False,
-                    'results_found': False,
-                    'num_cards_found': 0,
-                    'success': False,
-                    'error': str(result)
-                })
-            else:
-                processed_results.append(result)
-        
-        return processed_results
+        # Ожидаем завершения всех задач
+        for city, task in tasks:
+            try:
+                result = await task
+                
+                if result == 'found':
+                    self.successful_cities.append(city)
+                    print(f"✓ Найден: {city}")
+                elif result == 'not_found':
+                    self.failed_cities.append(city)
+                    print(f"✗ Не найден: {city}")
+                else:  # 'error'
+                    self.errors.append(city)
+                    print(f"⚠ Ошибка при проверке: {city}")
+                    
+            except Exception as e:
+                self.errors.append(city)
+                print(f"⚠ Исключение при проверке {city}: {str(e)}")
 
-    async def create_excel_template(self):
-        """Создаем шаблон Excel файла"""
-        os.makedirs("2gis_multi_city_results", exist_ok=True)
-        
-        self.wb = Workbook()
-        self.ws = self.wb.active
-        self.ws.title = "Проверка городов"
-        
-        headers = [
-            "Город", "City Code", "Начальный URL", "Финальный URL",
-            "Город в URL", "Найдены результаты", "Количество карточек",
-            "Успешно", "Ошибка"
-        ]
-        
-        for col, header in enumerate(headers, start=1):
-            self.ws.cell(row=1, column=col, value=header)
-            self.ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = 25
-
-    async def save_to_excel(self):
-        """Сохраняем результаты в Excel"""
-        if not self.results:
-            print("Нет данных для сохранения")
+    async def save_failed_cities(self):
+        """Сохраняем не найденные города в JSON файл"""
+        if not self.failed_cities:
             return
         
-        # Всегда создаем новый файл с заголовками
-        await self.create_excel_template()
+        failed_data = {
+            'total_failed': len(self.failed_cities),
+            'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
+            'keyword': self.keyword,
+            'failed_cities': self.failed_cities
+        }
         
-        # Записываем все результаты
-        current_row = 2
-        for result in self.results:
-            row = [
-                result.get('city_name', ''),
-                result.get('city_code', ''),
-                result.get('initial_url', ''),
-                result.get('final_url', ''),
-                result.get('city_in_url', False),
-                result.get('results_found', False),
-                result.get('num_cards_found', 0),
-                result.get('success', False),
-                result.get('error', '')[:100] if result.get('error') else ""
-            ]
-            
-            for col, value in enumerate(row, start=1):
-                self.ws.cell(row=current_row, column=col, value=value)
-            
-            current_row += 1
-        
-        self.wb.save(self.data_saving)
-        print(f"\n✓ Сохранено {len(self.results)} строк в {self.data_saving}")
+        with open(self.failed_cities_file, 'w', encoding='utf-8') as f:
+            json.dump(failed_data, f, ensure_ascii=False, indent=2)
 
-    async def get_random_user_agent(self):
-        """Случайный User-Agent"""
-        user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
-        ]
-        return random.choice(user_agents)
-
-    async def parse_all_cities(self):
-        """Основная функция парсинга всех городов"""
+    async def check_all_cities(self):
+        """Основная функция проверки всех городов"""
         start_time = time.time()
         total_cities = len(self.cities)
-        successful = 0
-        failed = 0
         
         print(f"\n{'='*60}")
-        print(f"Начинаем проверку {total_cities} городов")
+        print(f"ПРОВЕРКА ГОРОДОВ В 2ГИС")
+        print(f"{'='*60}")
+        print(f"Всего городов для проверки: {total_cities}")
         print(f"Ключевое слово: {self.keyword}")
-        print(f"Одновременно обрабатывается: {self.max_concurrent} городов")
+        print(f"Одновременно проверяется: {self.max_concurrent} городов")
+        print(f"Режим: только проверка существования")
         print(f"{'='*60}")
         
         async with async_playwright() as playwright:
-            # Запускаем браузер (headless=False для отладки)
-            browser = await playwright.chromium.launch(headless=True)
+            # Запускаем браузер в headless режиме
+            browser = await playwright.chromium.launch(
+                headless=True,
+                args=[
+                    '--disable-gpu',
+                    '--disable-dev-shm-usage',
+                    '--no-sandbox'
+                ]
+            )
             
-            # Создаем контекст браузера с настройками
+            # Создаем контекст браузера
             context = await browser.new_context(
-                user_agent=await self.get_random_user_agent(),
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 locale="ru-RU",
-                timezone_id="Europe/Moscow",
+                viewport={'width': 1920, 'height': 1080}
             )
             
             # Разбиваем города на пакеты
@@ -326,49 +191,73 @@ class TwoGisMultiCityParser:
             total_batches = len(batches)
             
             for batch_num, city_batch in enumerate(batches, 1):
-                print(f"\nПакет {batch_num}/{total_batches}: {', '.join(city_batch)}")
+                print(f"\nПакет {batch_num}/{total_batches}: проверка {len(city_batch)} городов")
                 
-                # Обрабатываем пакет городов параллельно
-                batch_results = await self.process_city_batch(city_batch, context)
-                
-                # Добавляем результаты
-                for result in batch_results:
-                    self.results.append(result)
-                    if result.get('success'):
-                        successful += 1
-                    else:
-                        failed += 1
+                # Проверяем пакет городов
+                await self.check_city_batch(city_batch, context)
                 
                 # Сохраняем промежуточные результаты
-                if batch_num % 2 == 0 or batch_num == total_batches:
-                    await self.save_to_excel()
-                    print(f"Промежуточное сохранение... Обработано {len(self.results)}/{total_cities} городов")
+                if batch_num % 5 == 0 or batch_num == total_batches:
+                    await self.save_failed_cities()
+                    processed = len(self.successful_cities) + len(self.failed_cities) + len(self.errors)
+                    print(f"Прогресс: {processed}/{total_cities} городов")
                 
                 # Небольшая задержка между пакетами
                 if batch_num < total_batches:
-                    await self.random_delay(2, 4)
+                    await self.random_delay(2, 3)
             
             # Закрываем браузер
             await browser.close()
         
-        # Выводим статистику
+        # Сохраняем финальные результаты
+        await self.save_failed_cities()
+        
+        # Выводим итоги
         end_time = time.time()
         total_time = end_time - start_time
         
-        cities_with_city_in_url = sum(1 for r in self.results if r.get('city_in_url'))
-        cities_with_results = sum(1 for r in self.results if r.get('results_found'))
-        
         print(f"\n{'='*60}")
-        print("ИТОГИ:")
+        print("ИТОГИ ПРОВЕРКИ:")
         print(f"{'='*60}")
-        print(f"Всего городов: {total_cities}")
-        print(f"Успешно обработано: {successful}")
-        print(f"Не удалось обработать: {failed}")
-        print(f"Городов с city_code в URL: {cities_with_city_in_url}")
-        print(f"Городов с найденными результатами: {cities_with_results}")
+        print(f"Всего проверено городов: {total_cities}")
+        print(f"✓ Найдено в 2ГИС: {len(self.successful_cities)}")
+        print(f"✗ Не найдено в 2ГИС: {len(self.failed_cities)}")
+        print(f"⚠ Ошибок при проверке: {len(self.errors)}")
         print(f"Время выполнения: {total_time:.2f} секунд")
-        print(f"Среднее время на город: {total_time/total_cities:.2f} секунд")
-        print(f"Файл с результатами: {os.path.abspath(self.data_saving)}")
+        
+        if self.failed_cities:
+            print(f"\nНе найденные города сохранены в файл:")
+            print(f"📁 {os.path.abspath(self.failed_cities_file)}")
+            print(f"\nСписок не найденных городов ({len(self.failed_cities)}):")
+            for i in range(0, len(self.failed_cities), 5):
+                batch = self.failed_cities[i:i+5]
+                print("  " + ", ".join(batch))
+        
+        if self.errors:
+            print(f"\nГорода с ошибками проверки ({len(self.errors)}):")
+            for i in range(0, len(self.errors), 5):
+                batch = self.errors[i:i+5]
+                print("  " + ", ".join(batch))
+
+def get_failed_cities_from_file(file_path: str = "2gis_check_results/failed_cities.json") -> List[str]:
+    """Получаем список не найденных городов из JSON файла"""
+    if not os.path.exists(file_path):
+        print(f"Файл {file_path} не найден!")
+        return []
+    
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        failed_cities = data.get('failed_cities', [])
+        print(f"Загружено {len(failed_cities)} не найденных городов из файла")
+        return failed_cities
+        
+    except Exception as e:
+        print(f"Ошибка при загрузке файла: {str(e)}")
+        return []
+
+
 
 async def main():
     # Для теста берем несколько городов
@@ -522,16 +411,15 @@ async def main():
     "Ярославль", "Ярцево", "Ясногорск", "Ясный", "Яхрома"
     ]
     
-    # Создаем парсер с максимальным количеством одновременных обработок = 4
-    parser = TwoGisMultiCityParser(
+    # Создаем чекер
+    checker = TwoGisCityChecker(
         cities=cities,
         keyword="Шубы",
-        max_num_firm=3,
-        max_concurrent=4  # Обрабатывать по 4 города одновременно
+        max_concurrent=5
     )
     
-    # Запускаем парсинг
-    await parser.parse_all_cities()
+    # Запускаем проверку
+    await checker.check_all_cities()
 
 if __name__ == "__main__":
     asyncio.run(main())
