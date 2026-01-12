@@ -17,6 +17,7 @@ class TwoGisMapParse:
         self.data_saving = "2gis_parse_results/data.xlsx"
         self.list_of_companies = []  # сюда добавляем списки из __get_firm_data, чтобы потом ввести их в xlsx
         self.start_row = 2
+        self.count_page = 0
         if os.path.exists(self.data_saving):
             os.remove(self.data_saving)
 
@@ -63,7 +64,9 @@ class TwoGisMapParse:
                 firm_data = await self.__get_firm_data(url=href)  # Ищем все данные фирмы
 
                 if self.true_phone != "---" or (self.true_phone == "---" and self.true_site != "Нет ссылки на сайт"):
-                    self.list_of_companies.append(firm_data)  # Добавляем в список, который потом пойдет в xlsx
+                    self.list_of_companies.append(firm_data)  # Добавляем в список, который потом пойдет в xlsx 
+        if len(found_links) == 0:
+            self.count_page += 1           
 
     async def __get_firm_data(self, url: str):
         """Берем данные фирмы: название, телефон, сайт"""
@@ -103,6 +106,9 @@ class TwoGisMapParse:
             except:
                 self.true_site = "Нет ссылки на сайт"
         await self.page2.close()
+        for i in ['улица', 'площадь', 'проспект', 'пр.', 'ул.', 'пл.']:
+            if i in firm_category.lower():
+                firm_category = '---'
         return [url, firm_title, firm_category, self.true_phone, self.true_site, "-"]
 
     async def check_xlsx(self):
@@ -149,47 +155,51 @@ class TwoGisMapParse:
     async def parse_main(self, update_callback=None):
         """Парсинг сайта"""
         async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(headless=False)  # headless=False - без графического итерфейса
-            self.context = await browser.new_context(
-                user_agent=await self.get_random_user_agent(),
-                locale="ru-RU",
-                timezone_id="Europe/Moscow",
-            )  # По типу вкладок инкогнито
-            self.page = (await self.context.new_page())  # Новая страница, создается в контексте
-            await self.page.goto(f"https://2gis.ru/{await self.translate_text(self.sity)}", wait_until="domcontentloaded")  # Переходим по адресу с переведенным городом
-            if await self.translate_text(self.sity) not in self.page.url:
-                await self.page.close()
-            # Ищем поле поиска, пишем туда keyword и печатаем каждую букву с промежутком времени 0.4 с
-            await self.page.get_by_placeholder("Поиск в 2ГИС").type(text=self.keyword, delay=0.4)
-            await self.page.keyboard.press("Enter")  # Нажимаем Enter
-            await self.random_delay(3, 4)  # Задержка для загрузки страницы
-            await self.check_xlsx()
-            # Собираем данные с задержками
-            while self.ws.max_row < self.max_num_firm:
-                print(self.ws.max_row)
-                await self.__get_links()  # Ищем ссылки и данные организаций
-                await self.data_output_to_xlsx(self.list_of_companies)  # Записываем данные в Excel
-                # Имитация просмотра страницы
-                await self.random_delay(1, 2)
-
-                # Переход на следующую страницу с проверкой
-                next_button = await self.page.query_selector('[style="transform: rotate(-90deg);"]')
-                if next_button and await next_button.is_visible():
+            try:
+                browser = await playwright.chromium.launch(headless=False)  # headless=True - без графического итерфейса
+                self.context = await browser.new_context(
+                    user_agent=await self.get_random_user_agent(),
+                    locale="ru-RU",
+                    timezone_id="Europe/Moscow",
+                )  # По типу вкладок инкогнито
+                self.page = (await self.context.new_page())  # Новая страница, создается в контексте
+                await self.page.goto(f"https://2gis.ru/{await self.translate_text(self.sity)}", wait_until="domcontentloaded")  # Переходим по адресу с переведенным городом
+                if await self.translate_text(self.sity) not in self.page.url:
+                    await browser.close()
+                # Ищем поле поиска, пишем туда keyword и печатаем каждую букву с промежутком времени 0.4 с
+                await self.page.get_by_placeholder("Поиск в 2ГИС").type(text=self.keyword, delay=0.4)
+                await self.page.keyboard.press("Enter")  # Нажимаем Enter
+                await self.random_delay(3, 4)  # Задержка для загрузки страницы
+                await self.check_xlsx()
+                # Собираем данные с задержками
+                while self.ws.max_row < self.max_num_firm:
+                    if self.ws.max_row - 1 != 0:
+                        print(f'Записанных фирм в xlsx: {self.ws.max_row - 1}')
+                    if self.count_page == 3:
+                        break
+                    await self.__get_links()  # Ищем ссылки и данные организаций
+                    await self.data_output_to_xlsx(self.list_of_companies)  # Записываем данные в Excel
+                    # Имитация просмотра страницы
                     await self.random_delay(1, 2)
-                    await next_button.click()
-                    await self.random_delay(3, 4.5)  # Ждем загрузки следующей страницы
-                else:
-                    break  # Больше нет страниц
-            else:
-                await self.page.close()
 
-            print(f"Записано {self.ws.max_row - 1} организаций")
-            await asyncio.sleep(4)
-            browser.close()
+                    # Переход на следующую страницу с проверкой
+                    next_button = await self.page.query_selector('[style="transform: rotate(-90deg);"]')
+                    if next_button and await next_button.is_visible():
+                        await self.random_delay(1, 2)
+                        await next_button.click()
+                        await self.random_delay(3, 4.5)  # Ждем загрузки следующей страницы
+                    else:
+                        break  # Больше нет страниц
+                else:
+                    await self.page.close()
+
+                print(f"Записано {self.ws.max_row - 1} организаций")
+            except Exception as e:
+                print(f"Произошла ошибка: {e}")
 
 
 async def main():
-    parser = TwoGisMapParse(keyword="Авто Мойка", sity="Малоярославец", max_num_firm=5)
+    parser = TwoGisMapParse(keyword="Шубы", sity="Саратов", max_num_firm=50)
     await parser.parse_main()
 
 

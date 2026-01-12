@@ -18,7 +18,7 @@ class MainApplication(ttk.Frame):
         self.parent.geometry("1000x700")
         
         try:
-            icon = tk.PhotoImage(file="static/mappin.png")
+            icon = tk.PhotoImage(file="static/icon.ico")
             self.parent.iconphoto(True, icon)
         except Exception:
             pass

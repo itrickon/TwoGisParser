@@ -20,6 +20,6 @@ setup(
     options={"build_exe": build_exe_options},
     executables=[Executable("gui.py", 
                           base=base, 
-                          icon="static/mappin.png",
+                          icon="static/icon.ico",
                           target_name="TwoGisParser.exe")]
 )
