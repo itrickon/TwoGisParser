@@ -103,7 +103,7 @@ class TwoGisMapParse:
             except:
                 self.true_site = "Нет ссылки на сайт"
         await self.page2.close()
-        return ['', firm_title, firm_category, self.true_phone, self.true_site, "-"]
+        return [url, firm_title, firm_category, self.true_phone, self.true_site, "-"]
 
     async def check_xlsx(self):
         """Функция для создания заготовки под xlsx файл"""
@@ -134,7 +134,7 @@ class TwoGisMapParse:
 
         # Сохранить файл
         self.wb.save(self.data_saving)
-        print(self.list_of_companies)
+        print(*list(map(lambda x: x[1:-1],self.list_of_companies)), sep='\n')
         print(f"Записано {len(get_firm_data)} строк в файл data.xlsx")
 
     async def get_random_user_agent(self):
