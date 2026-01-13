@@ -9,6 +9,8 @@ from tkinter import ttk, messagebox
 from googletrans import Translator
 from MainTwoGis import TwoGisMapParse
 from async_runner import AsyncParserRunner
+from tkinter import messagebox, Toplevel, Text, font
+
 
 class MainApplication(ttk.Frame):
     def __init__(self, parent, *args, **kwargs):
@@ -58,6 +60,7 @@ class MainApplication(ttk.Frame):
         menubar.add_cascade(label="Справка", menu=help_menu)
         help_menu.add_command(label="Руководство пользователя", command=self.user_manual)
         help_menu.add_command(label="Горячие клавиши", command=self.hotkeys_info)
+        help_menu.add_command(label="Одноименные города", command=self.namesakes)
         help_menu.add_separator()
         help_menu.add_command(label="О программе", command=self.btn_about)
 
@@ -464,19 +467,91 @@ class MainApplication(ttk.Frame):
         Горячие клавиши приложения:
         
         Основные операции:
-        • Ctrl + R      - Запустить парсинг
-        • Ctrl + S      - Остановить парсинг
-        • Ctrl + L      - Очистить лог
-        • Ctrl + Q      - Выйти из приложения
+        • Ctrl + R  - Запустить парсинг
+        • Ctrl + S   - Остановить парсинг
+        • Ctrl + L   - Очистить лог
+        • Ctrl + Q   - Выйти из приложения
         
         Дополнительные:
-        • Ctrl + G      - Сгенерировать URL (в режиме по ключу)
-        • F1            - Руководство пользователя
-        • Enter         - Запустить парсинг (когда курсор в поле ввода)
+        • Ctrl + G - Сгенерировать URL (в режиме по ключу)
+        • F1           - Руководство пользователя
+        • Enter      - Запустить парсинг (когда курсор в поле ввода)
         
         Сочетания клавиш работают в любом месте приложения.
         """
         messagebox.showinfo("Горячие клавиши", hotkeys_text, icon="info")
+
+    def namesakes(self):
+        """Обработчик кнопки 'Одноименные города' с форматированием"""
+        # Создаем собственное окно вместо messagebox
+        top = Toplevel()
+        top.title("Одноименные города")
+        
+        # Создаем текстовое поле с полосой прокрутки
+        text_widget = Text(top, wrap=tk.WORD, width=40, height=25, 
+                        font=("Arial", 10), padx=10, pady=10)
+        
+        # Настраиваем жирный шрифт
+        bold_font = font.Font(family="Arial", size=10, weight="bold")
+        
+        # Вставляем текст с форматированием
+        text_widget.insert("1.0", "Города-тёзки в России:\n\n")
+        
+        # Устанавливаем жирный стиль для заголовка
+        text_widget.tag_add("bold", "1.0", "1.18")
+        text_widget.tag_configure("bold", font=bold_font)
+        
+        # Добавляем остальной текст
+        cities = [
+            'Города-тёзки в России:\n',
+            '· Белогорск:\n',
+            'Амурская область и Республика Крым\n',
+            '· Берёзовский:\n',
+            'Свердловская область и Кемеровская область\n',
+            '· Гурьевск:\n',
+            'Калининградская область и Кемеровская область\n',
+            '· Железногорск:\n',
+            'Красноярский край и Курская область\n',
+            '· Заречный:\n',
+            'Свердловская область и Пензенская область\n',
+            '· Кировск:\n',
+            'Мурманская область и Ленинградская область\n',
+            '· Красноармейск:\n',
+            'Московская область и Саратовская область\n',
+            '· Краснознаменск:\n',
+            'Калининградская область и Московская область\n',
+            '· Краснослободск:\n',
+            'Республика Мордовия и Волгоградская область\n',
+            '· Мирный:\n',
+            'Республика Саха (Якутия) и Архангельская область\n',
+            '· Михайловск:\n',
+            'Ставропольский край и Свердловская область\n',
+            '· Никольск:\n',
+            'Пензенская область и Вологодская область\n',
+            '· Приморск:\n',
+            'Ленинградская область и Калининградская область\n',
+            '· Советск:\n',
+            'Калининградская область, Кировская область и Тульская область\n',
+        ]
+        
+        for city_text in cities:
+            text_widget.insert(tk.END, city_text)
+        
+        text_widget.configure(state='disabled')  # Только для чтения
+        
+        # Кнопка закрытия
+        button = tk.Button(top, text="Закрыть", command=top.destroy)
+        
+        text_widget.pack()
+        button.pack(pady=10)
+        
+        # Центрируем окно
+        top.update_idletasks()
+        width = top.winfo_width()
+        height = top.winfo_height()
+        x = (top.winfo_screenwidth() // 2) - (width // 2)
+        y = (top.winfo_screenheight() // 2) - (height // 2)
+        top.geometry(f'{width}x{height}+{x}+{y}')
 
     def btn_about(self):
         """Обработчик кнопки 'О программе'"""
