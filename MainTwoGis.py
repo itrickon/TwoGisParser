@@ -9,6 +9,7 @@ from openpyxl import Workbook
 from googletrans import Translator
 from heavy_dicts import city_mapping
 
+
 class TwoGisMapParse:
     def __init__(self, keyword: str, sity: str, max_num_firm: int):
         self.keyword = keyword  # Ищем по ключевому слову
@@ -28,21 +29,21 @@ class TwoGisMapParse:
     async def translate_text(self, sity):
         """Переводим город на английский для удобства"""
         # Проверяем, является ли слово английским (только латинские буквы)
-        is_english = bool(re.match(r'^[a-zA-Z\s\-]+$', sity))
-        
+        is_english = bool(re.match(r"^[a-zA-Z\s\-]+$", sity))
+
         try:
             return city_mapping[sity]
         except:
             pass
         if is_english:
             # Если уже английское слово, просто форматируем
-            sity_clean = '-'.join(sity.split())
+            sity_clean = "-".join(sity.split())
             return sity_clean.lower()
         else:
             # Если русское слово - переводим
             self.translator = Translator()
             a = await self.translator.translate(sity, src="ru", dest="en")
-            a = '-'.join(a.text.split())
+            a = "-".join(a.text.split())
             return a.lower()
 
     async def __get_links(self) -> List[str]:
@@ -59,14 +60,14 @@ class TwoGisMapParse:
             # На всякий случай делаю ещё проверку; Ещё проверяю город, чтоб не искало в регионах
             if href and "/firm/" in href and await self.translate_text(self.sity) in href:
                 href = f"https://2gis.ru{href}"  # Делаем полное url
-                if self.ws.max_row + len(self.list_of_companies) - 1>= self.max_num_firm:
+                if self.ws.max_row + len(self.list_of_companies) - 1 >= self.max_num_firm:
                     break
                 firm_data = await self.__get_firm_data(url=href)  # Ищем все данные фирмы
 
                 if self.true_phone != "---" or (self.true_phone == "---" and self.true_site != "Нет ссылки на сайт"):
-                    self.list_of_companies.append(firm_data)  # Добавляем в список, который потом пойдет в xlsx 
+                    self.list_of_companies.append(firm_data)  # Добавляем в список, который потом пойдет в xlsx
         if len(found_links) == 0:
-            self.count_page += 1           
+            self.count_page += 1
 
     async def __get_firm_data(self, url: str):
         """Берем данные фирмы: название, телефон, сайт"""
@@ -99,16 +100,16 @@ class TwoGisMapParse:
         if site_elements:  # Если есть хоть одна ссылка
             site_texts = [await element.text_content() for element in site_elements]
             try:
-                a = list(filter(lambda i: (i if (".ru" in i or ".com" in i or 
-                                                 ".рф" in i or ".net" in i
-                                                 ) and "@" not in i else ""),site_texts,))  # Фильтруем, чтоб выводилось нужное
+                a = list(
+                    filter(lambda i: (i if (".ru" in i or ".com" in i or ".рф" in i or ".net" in i) and "@" not in i else ""),site_texts,)
+                )  # Фильтруем, чтоб выводилось нужное
                 self.true_site = f"{a[0]}"
             except:
                 self.true_site = "Нет ссылки на сайт"
         await self.page2.close()
-        for i in ['улица', 'площадь', 'проспект', 'пр.', 'ул.', 'пл.']:
+        for i in ["улица", "площадь", "проспект", "пр.", "ул.", "пл."]:
             if i in firm_category.lower():
-                firm_category = '---'
+                firm_category = "---"
         return [url, firm_title, firm_category, self.true_phone, self.true_site, "-"]
 
     async def check_xlsx(self):
@@ -140,7 +141,7 @@ class TwoGisMapParse:
 
         # Сохранить файл
         self.wb.save(self.data_saving)
-        print(*list(map(lambda x: x[1:-1],self.list_of_companies)), sep='\n')
+        print(*list(map(lambda x: x[1:-1], self.list_of_companies)), sep="\n")
         print(f"Записано {len(get_firm_data)} строк в файл data.xlsx")
 
     async def get_random_user_agent(self):
@@ -163,18 +164,23 @@ class TwoGisMapParse:
                     timezone_id="Europe/Moscow",
                 )  # По типу вкладок инкогнито
                 self.page = (await self.context.new_page())  # Новая страница, создается в контексте
-                await self.page.goto(f"https://2gis.ru/{await self.translate_text(self.sity)}", wait_until="domcontentloaded")  # Переходим по адресу с переведенным городом
+                await self.page.goto(
+                    f"https://2gis.ru/{await self.translate_text(self.sity)}",
+                    wait_until="domcontentloaded",
+                )  # Переходим по адресу с переведенным городом
                 if await self.translate_text(self.sity) not in self.page.url:
                     await browser.close()
+
                 # Ищем поле поиска, пишем туда keyword и печатаем каждую букву с промежутком времени 0.4 с
                 await self.page.get_by_placeholder("Поиск в 2ГИС").type(text=self.keyword, delay=0.4)
                 await self.page.keyboard.press("Enter")  # Нажимаем Enter
                 await self.random_delay(3, 4)  # Задержка для загрузки страницы
                 await self.check_xlsx()
+
                 # Собираем данные с задержками
                 while self.ws.max_row < self.max_num_firm:
                     if self.ws.max_row - 1 != 0:
-                        print(f'Записанных фирм в xlsx: {self.ws.max_row - 1}')
+                        print(f"Записанных фирм в xlsx: {self.ws.max_row - 1}")
                     if self.count_page == 3:
                         break
                     await self.__get_links()  # Ищем ссылки и данные организаций
@@ -191,7 +197,7 @@ class TwoGisMapParse:
                     else:
                         break  # Больше нет страниц
                 else:
-                    await self.page.close()
+                    await browser.close()
 
                 print(f"Записано {self.ws.max_row - 1} организаций")
             except Exception as e:

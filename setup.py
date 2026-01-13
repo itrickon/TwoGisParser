@@ -2,7 +2,7 @@ from cx_Freeze import setup, Executable
 import sys
 
 build_exe_options = {
-    "packages": ["tkinter", "sv_ttk", "pytest-playwright", "googletrans", 'openpyxl'],
+    "packages": ["tkinter", "sv_ttk", "pytest-playwright", "googletrans", "openpyxl"],
     "include_files": [],
     "excludes": ["test"],
     "include_msvcr": True,

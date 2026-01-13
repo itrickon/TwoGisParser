@@ -1,6 +1,5 @@
 import asyncio
 import threading
-from MainTwoGis import TwoGisMapParse
 
 
 class AsyncParserRunner:
@@ -9,20 +8,20 @@ class AsyncParserRunner:
         self.update_callback = update_callback
         self.loop = None
         self.task = None
-        
+
     def start(self):
         """Запуск парсинга в отдельном потоке с корректной обработкой asyncio"""
         thread = threading.Thread(target=self._run_in_thread, daemon=True)
         thread.start()
         return thread
-        
+
     def _run_in_thread(self):
         """Запуск asyncio в отдельном потоке"""
         try:
             # Создаем новый event loop для этого потока
             self.loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self.loop)
-            
+
             # Запускаем парсинг
             self.loop.run_until_complete(self._parse())
         except Exception as e:
@@ -31,15 +30,15 @@ class AsyncParserRunner:
         finally:
             if self.loop and not self.loop.is_closed():
                 self.loop.close()
-                
+
     async def _parse(self):
         """Основная функция парсинга"""
         try:
             if self.update_callback:
                 self.update_callback("Начало парсинга...")
-            
+
             await self.parser_instance.parse_main(update_callback=self.update_callback)
-            
+
             if self.update_callback:
                 self.update_callback("Парсинг успешно завершен")
         except Exception as e:
