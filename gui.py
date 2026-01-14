@@ -174,8 +174,8 @@ class MainApplication(ttk.Frame):
         # Добавляем раскраску вывода текста в "Лог выполнения"
         self.log_text.tag_config("INFO", foreground="black")
         self.log_text.tag_config("ERROR", foreground="red")
-        self.log_text.tag_config("WARNING", foreground="orange")
-        self.log_text.tag_config("SUCCESS", foreground="green")
+        self.log_text.tag_config("WARNING", foreground="#cf7c00")
+        self.log_text.tag_config("SUCCESS", foreground="#00a800")
         
         # Добавляем скроллбар
         scrollbar = ttk.Scrollbar(self.log_text)
@@ -236,9 +236,15 @@ class MainApplication(ttk.Frame):
         
         if self.parser_mode_t.get() == "tlight":
             sv_ttk.set_theme("light")
+            self.log_text.tag_config("INFO", foreground="black")
+            self.log_text.tag_config("WARNING", foreground="#cf7c00")
+            self.log_text.tag_config("SUCCESS", foreground="#00a800")
             self.status_var.set("Установлена: Светлая тема")
         else:
             sv_ttk.set_theme("dark")
+            self.log_text.tag_config("INFO", foreground="white")
+            self.log_text.tag_config("WARNING", foreground="#ffc766")
+            self.log_text.tag_config("SUCCESS", foreground="#00e600")
             self.status_var.set("Установлена: Темная тема")
             
         # Принудительно обновляем интерфейс
@@ -436,30 +442,59 @@ class MainApplication(ttk.Frame):
 
     def user_manual(self):
         """Обработчик кнопки 'Руководство пользователя'"""
-        about_text = """
-        Руководство пользователя
+        # Создаем собственное окно вместо messagebox
+        top = Toplevel()
+        top.title("Горячие клавиши")
         
-        1. Выберите режим парсинга:
-           • Парсер по ключу - поиск по ключевому слову и городу
-           • Парсер по URL - парсинг конкретной страницы 2ГИС
+        # Создаем Frame для размещения текстового виджета и скроллбара
+        frame = tk.Frame(top)
+        frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
-        2. Заполните параметры:
-           • Для парсера по ключу: ключевое слово и город
-           • Для парсера по URL: вставьте URL страницы
-           • Укажите количество фирм для парсинга
+        # Создаем текстовое поле
+        text_widget = Text(frame, wrap=tk.WORD, width=60, height=20, 
+                        font=("Arial", 10))
         
-        3. Дополнительные параметры:
-           • Для парсера по ключу: кнопка "Сгенерировать URL"
         
-        4. Нажмите "Запустить парсинг"
+        top.resizable(False, False)
         
-        Примечания:
-            • Парсинг выполняется асинхронно - интерфейс не блокируется
-            • Результаты сохраняются в папке 2gis_parse_results/data.xlsx
-            • Для работы требуется установленный Playwright
-            • Можно остановить парсинг в любой момент
-        """
-        messagebox.showinfo("Руководство пользователя", about_text, icon="question")
+        # Добавляем остальной текст
+        user_manual_text = [
+        "     Руководство пользователя\n",
+        "  1. Выберите режим парсинга:\n",
+        "   • Парсер по ключу - поиск по ключевому слову и городу\n",
+        "   • Парсер по URL - парсинг конкретной страницы 2ГИС\n\n",
+        "  2. Заполните параметры:\n",
+        "   • Для парсера по ключу: ключевое слово и город\n",
+        "   • Для парсера по URL: вставьте URL страницы\n",
+        "   • Укажите количество фирм для парсинга\n\n",
+        "  3. Дополнительные параметры:\n",
+        "   • Для парсера по ключу: кнопка 'Сгенерировать URL'\n",
+        "  4. Нажмите 'Запустить парсинг'\n\n",
+        "  Примечания:\n",
+        "    • Парсинг выполняется асинхронно - интерфейс не блокируется\n",
+        "    • Результаты сохраняются в папке 2gis_parse_results/data.xlsx\n",
+        "    • Для работы требуется установленный Playwright\n",
+        "    • Можно остановить парсинг в любой момент\n",
+        ]
+        
+        for city_text in user_manual_text:
+            text_widget.insert(tk.END, city_text)
+        
+        text_widget.configure(state='disabled')  # Только для чтения
+        
+        # Кнопка закрытия
+        button = tk.Button(top, text="Закрыть", command=top.destroy)
+        
+        text_widget.pack()
+        button.pack(pady=10)
+        
+        # Центрируем окно
+        top.update_idletasks()
+        width = top.winfo_width()
+        height = top.winfo_height()
+        x = (top.winfo_screenwidth() // 2) - (width // 2)
+        y = (top.winfo_screenheight() // 2) - (height // 2)
+        top.geometry(f'{width}x{height}+{x}+{y}')
 
     def hotkeys_info(self):
         """Обработчик кнопки 'Горячие клавиши'"""
@@ -480,7 +515,7 @@ class MainApplication(ttk.Frame):
         
         # Добавляем остальной текст
         cities = [
-        " Горячие клавиши приложения:\n",
+        "       Горячие клавиши приложения:\n",
         "   Основные операции:\n",
         "     • Ctrl + R   - Запустить парсинг\n",
         "     • Ctrl + S   - Остановить парсинг\n",
@@ -538,7 +573,7 @@ class MainApplication(ttk.Frame):
         
         # Добавляем остальной текст
         cities = [
-            '        Города-тёзки в России:\n',
+            '      Города-тёзки в России:\n',
             '  · Белогорск:\n',
             '      Амурская область и Республика Крым\n',
             '  · Берёзовский:\n',
@@ -590,32 +625,60 @@ class MainApplication(ttk.Frame):
 
     def btn_about(self):
         """Обработчик кнопки 'О программе'"""
-        about_text = """
-        Парсер данных 2ГИС
-        Данный инструмент предназначен для сбора открытой информации в образовательных и исследовательских целях.
+        # Создаем собственное окно вместо messagebox
+        top = Toplevel()
+        top.title("Одноименные города")
         
-        Версия 4.0.0
+        # Создаем Frame для размещения текстового виджета и скроллбара
+        frame = tk.Frame(top)
+        frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
         
-        Режимы работы:
-        1. Парсер по ключу - поиск организаций по ключевому слову и городу
-        2. Парсер по URL - парсинг конкретной страницы поиска 2ГИС
+        # Создаем текстовое поле
+        text_widget = Text(frame, wrap=tk.WORD, width=67, height=20, 
+                        font=("Arial", 10))
         
-        Возможности:
-        • Асинхронный парсинг с Playwright
-        • Сохранение данных в Excel
-        • Автоматическая генерация URL
-        • Поддержка светлой и темной темы
+        top.resizable(False, False)
         
-        https://github.com/itrickon/TwoGisParser
+        # Добавляем остальной текст
+        about_text = [
+        "       Парсер данных 2ГИС\n",
+        "  Данный инструмент предназначен для сбора открытой информации в образовательных и исследовательских целях.\n",
+        "    Версия 4.0.0\n",
+        "  Режимы работы:\n",
+        "    1. Парсер по ключу - поиск организаций по ключевому слову и городу\n",
+        "    2. Парсер по URL - парсинг конкретной страницы поиска 2ГИС\n",
+        "  Возможности:\n",
+        "    • Асинхронный парсинг с Playwright\n",
+        "    • Сохранение данных в Excel\n",
+        "    • Автоматическая генерация URL\n",
+        "    • Поддержка светлой и темной темы\n",
+        "  https://github.com/itrickon/TwoGisParser\n",
+        "  Используемые технологии:\n",
+        "    • Python 3.11+\n",
+        "    • Playwright для веб-скрапинга\n",
+        "    • tkinter для графического интерфейса\n",
+        "    • sv_ttk для современных стилей\n",
+        "    • Openpyxl для работы с Excel\n",
+        ]
         
-        Используемые технологии:
-        • Python 3.11+
-        • Playwright для веб-скрапинга
-        • tkinter для графического интерфейса
-        • sv_ttk для современных стилей
-        • Openpyxl для работы с Excel
-        """
-        messagebox.showinfo("О программе", about_text)
+        for city_text in about_text:
+            text_widget.insert(tk.END, city_text)
+        
+        text_widget.configure(state='disabled')  # Только для чтения
+        
+        # Кнопка закрытия
+        button = tk.Button(top, text="Закрыть", command=top.destroy)
+        
+        text_widget.pack()
+        button.pack(pady=10)
+        
+        # Центрируем окно
+        top.update_idletasks()
+        width = top.winfo_width()
+        height = top.winfo_height()
+        x = (top.winfo_screenwidth() // 2) - (width // 2)
+        y = (top.winfo_screenheight() // 2) - (height // 2)
+        top.geometry(f'{width}x{height}+{x}+{y}')
 
     def btn_exit(self):
         """Выход из приложения"""
