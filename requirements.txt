@@ -1,6 +1,0 @@
-playwright
-pytest-playwright
-googletrans
-openpyxl
-sv-ttk
-pyinstaller
