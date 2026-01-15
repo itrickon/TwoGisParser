@@ -55,4 +55,40 @@ if exist "2GIS_Parser" (
     echo The 2GIS_Parser folder was not created.
 )
 echo.
+echo Creating desktop shortcut...
+
+set "EXE_PATH=%CD%\2GIS_Parser.exe"
+set "DESKTOP_PATH=%USERPROFILE%\Desktop"
+set "SHORTCUT_NAME=2GIS Parser.lnk"
+set "ICON_PATH=%CD%\static\icon.ico"
+
+echo EXE path: %EXE_PATH%
+echo Desktop path: %DESKTOP_PATH%
+
+:: Проверяем, существует ли EXE
+if not exist "%EXE_PATH%" (
+    echo ERROR: 2GIS_Parser.exe not found!
+    pause
+    exit /b 1
+)
+
+:: Создаем ярлык через PowerShell
+echo Creating shortcut via PowerShell...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+"$WshShell = New-Object -ComObject WScript.Shell; ^
+$Shortcut = $WshShell.CreateShortcut('%DESKTOP_PATH%\%SHORTCUT_NAME%'); ^
+$Shortcut.TargetPath = '%EXE_PATH%'; ^
+$Shortcut.WorkingDirectory = '%CD%'; ^
+$Shortcut.IconLocation = '%ICON_PATH%'; ^
+$Shortcut.Description = '2GIS Parser Application'; ^
+$Shortcut.Save(); ^
+Write-Host 'Shortcut created successfully!'"
+
+:: Проверяем создание
+if exist "%DESKTOP_PATH%\%SHORTCUT_NAME%" (
+    echo Desktop shortcut created: %SHORTCUT_NAME%
+) else (
+    echo Failed to create desktop shortcut
+)
+echo.
 pause

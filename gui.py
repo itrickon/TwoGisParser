@@ -20,10 +20,9 @@ class MainApplication(ttk.Frame):
         self.parent.geometry("1000x700")
         
         try:
-            icon = tk.PhotoImage(file="static/icon.ico")
-            self.parent.iconphoto(True, icon)
-        except Exception:
-            pass
+            self.parent.iconbitmap("static/icon.ico")
+        except Exception as e:
+            print(f"Cannot load icon: {e}")
   
         self.interface_style()
         self.pack(fill=tk.BOTH, expand=True)
