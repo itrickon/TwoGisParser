@@ -2,13 +2,12 @@
 chcp 1251 >nul
 echo.
 echo ====================================================
-echo |                   Parser 2GIS                    |
+echo =                   Parser 2GIS                    =
 echo ====================================================
 echo.
 
 echo.
 echo Installing dependencies...
-powershell -Command "Invoke-WebRequest -Uri 'https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe' -OutFile 'python_setup.exe'"
 pip install sv-ttk
 pip install pyinstaller
 pip install googletrans
