@@ -66,8 +66,6 @@ class TwoGisMapParse:
 
                 if self.true_phone != "---" or (self.true_phone == "---" and self.true_site != "Нет ссылки на сайт"):
                     self.list_of_companies.append(firm_data)  # Добавляем в список, который потом пойдет в xlsx
-        if len(found_links) == 0:
-            self.count_page += 1
 
     async def __get_firm_data(self, url: str):
         """Берем данные фирмы: название, телефон, сайт"""
@@ -142,6 +140,8 @@ class TwoGisMapParse:
         # Сохранить файл
         self.wb.save(self.data_saving)
         print(*list(map(lambda x: x[1:-1], self.list_of_companies)), sep="\n")
+        if len(get_firm_data) == 0:
+            self.count_page += 1
         print(f"Записано {len(get_firm_data)} строк в файл data.xlsx")
 
     async def get_random_user_agent(self):
@@ -181,7 +181,7 @@ class TwoGisMapParse:
                 while self.ws.max_row < self.max_num_firm:
                     if self.ws.max_row - 1 != 0:
                         print(f"Записанных фирм в xlsx: {self.ws.max_row - 1}")
-                    if self.count_page == 3:
+                    if self.count_page == 5:
                         break
                     await self.__get_links()  # Ищем ссылки и данные организаций
                     await self.data_output_to_xlsx(self.list_of_companies)  # Записываем данные в Excel
@@ -201,7 +201,11 @@ class TwoGisMapParse:
 
                 print(f"Записано {self.ws.max_row - 1} организаций")
             except Exception as e:
-                print(f"Произошла ошибка: {e}")
+                error_msg = f"Произошла ошибка: {e}"
+                print(error_msg)
+                if update_callback:
+                    update_callback(error_msg)
+                raise
 
 
 async def main():

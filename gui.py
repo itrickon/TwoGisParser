@@ -374,13 +374,29 @@ class MainApplication(ttk.Frame):
             # Создаем и запускаем runner
             runner = AsyncParserRunner(
                 parser_instance, 
-                update_callback=self.update_gui_from_thread
+                update_callback=self.update_gui_from_thread,
+                completion_callback=self.on_parsing_complete
             )
             self.parser_thread = runner.start()
             
         except Exception as e:
             self.update_gui_from_thread(f"Ошибка запуска: {str(e)}")
             self.is_parsing = False
+        
+    def on_parsing_complete(self, flag=True):
+        """Вызывается при завершении парсинга (успешном или с ошибкой)"""
+        def update():
+            self.is_parsing = False
+            if flag:
+                self.status_var.set("Парсинг успешно завершен")
+                self.log_message("Парсинг успешно завершен")
+            else:
+                self.status_var.set("Парсинг остановлен")
+                self.log_message("Парсинг остановлен")
+                
+        
+        # Выполняем в основном потоке GUI
+        self.after(0, update)
             
     def update_gui_from_thread(self, message):
         """Обновление GUI из потока"""
@@ -642,7 +658,7 @@ class MainApplication(ttk.Frame):
         about_text = [
         "       Парсер данных 2ГИС\n",
         "  Данный инструмент предназначен для сбора открытой информации в образовательных и исследовательских целях.\n",
-        "    Версия 4.0.0\n",
+        "    Версия 4.0.1\n",
         "  Режимы работы:\n",
         "    1. Парсер по ключу - поиск организаций по ключевому слову и городу\n",
         "    2. Парсер по URL - парсинг конкретной страницы поиска 2ГИС\n",

@@ -3,9 +3,10 @@ import threading
 
 
 class AsyncParserRunner:
-    def __init__(self, parser_instance, update_callback=None):
+    def __init__(self, parser_instance, update_callback=None, completion_callback=None):
         self.parser_instance = parser_instance
         self.update_callback = update_callback
+        self.completion_callback = completion_callback
         self.loop = None
         self.task = None
 
@@ -39,9 +40,11 @@ class AsyncParserRunner:
 
             await self.parser_instance.parse_main(update_callback=self.update_callback)
 
-            if self.update_callback:
-                self.update_callback("Парсинг успешно завершен")
+            if self.completion_callback:
+                self.completion_callback(flag=True)
         except Exception as e:
             if self.update_callback:
                 self.update_callback(f"Ошибка при парсинге: {str(e)}")
+            if self.completion_callback:
+                self.completion_callback(flag=False)
             raise
