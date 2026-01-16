@@ -7,7 +7,7 @@ from playwright.async_api import async_playwright
 from typing import List
 from openpyxl import Workbook
 from googletrans import Translator
-from heavy_dicts import city_mapping
+from Main_2GIS_files.heavy_dicts import city_mapping
 
 
 class TwoGisMapParse:
@@ -197,6 +197,8 @@ class TwoGisMapParse:
                     else:
                         break  # Больше нет страниц
                 else:
+                    if self.page2:
+                        await self.page2.close()
                     await browser.close()
 
                 print(f"Записано {self.ws.max_row - 1} организаций")

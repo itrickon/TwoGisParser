@@ -2,13 +2,14 @@ import tkinter as tk
 import sv_ttk
 import threading
 import asyncio
-import heavy_dicts
+import Main_2GIS_files.heavy_dicts as heavy_dicts
 import re
 import datetime
+import time
 from tkinter import ttk, messagebox
 from googletrans import Translator
 from MainTwoGis import TwoGisMapParse
-from async_runner import AsyncParserRunner
+from Main_2GIS_files.async_runner import AsyncParserRunner
 from tkinter import messagebox, Toplevel, Text
 
 
@@ -413,6 +414,7 @@ class MainApplication(ttk.Frame):
             return
         
         # Закрытие страницы в отдельном потоке
+        time.sleep(1)
         if hasattr(self, 'parser_instance'):
             threading.Thread(
                 target=lambda: asyncio.run(self.parser_instance.page.close()) 
@@ -658,7 +660,7 @@ class MainApplication(ttk.Frame):
         about_text = [
         "       Парсер данных 2ГИС\n",
         "  Данный инструмент предназначен для сбора открытой информации в образовательных и исследовательских целях.\n",
-        "    Версия 4.0.1\n",
+        "    Версия 4.0.2\n",
         "  Режимы работы:\n",
         "    1. Парсер по ключу - поиск организаций по ключевому слову и городу\n",
         "    2. Парсер по URL - парсинг конкретной страницы поиска 2ГИС\n",
