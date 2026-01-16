@@ -59,7 +59,13 @@
 
 ### Способ 3: Исполняемый файл
 
-- Запустите **twogispars.bat**
+- Запустите **python_installer_1.bat**
+- После обработки файла появится установщик Python
+- Отметьте галочкой **Use admin privileges when installing py.exe**
+- Отметьте галочкой **Add python.exe to PATH**
+- Нажмите на кнопку **Install Now**
+- После загрузки появится **Setup was successful** нажмите на кнопку **Close**
+- Запустите **twogisparser_installer_2.bat**
 - Дождитесь установки зависимостей и сборки EXE-файла
 - Откройте **dist/TwoGisParser.exe**
 - Используйте графический интерфейс как описано в **способе 2**
